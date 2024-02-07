@@ -30,3 +30,5 @@ class BaseConfig:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SECRET_KEY = 'secret_key'
     #SECRET_KEY = os.environ['SECRET_KEY']
+
+
