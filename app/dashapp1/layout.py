@@ -17,12 +17,13 @@ import dash_table
 from flask_login import current_user
 from app.models import User, Post, Ownership
 import base64
-
-
+import dash_uploader as du
+import uuid
+import dash_dangerously_set_inner_html
 
 SIDEBAR_STYLE = {
         "position": "fixed",
-        "top": 62.5,
+        "top": 53.5,
         "left": 0,
         "bottom": 0,
         "width": "16rem",
@@ -31,48 +32,46 @@ SIDEBAR_STYLE = {
         "overflow-x": "hidden",
         "transition": "all 0.5s",
         "padding": "0.5rem 1rem",
-        "background-color": "#f8f9fa",
+        "background-color": "#000000",
     }
 
-SIDEBAR_HIDEN = {
-    "position": "fixed",
-    "top": 62.5,
-    "left": "-16rem",
-    "bottom": 0,
-    "width": "16rem",
-    "height": "100%",
-    "z-index": 1,
-    "overflow-x": "hidden",
-    "transition": "all 0.5s",
-    "padding": "0rem 0rem",
-    "background-color": "#f8f9fa",
-}
+
 
 # the styles for the main content position it to the right of the sidebar and
 # add some padding.
-CONTENT_STYLE = {
-    "transition": "margin-left .5s",
-    "margin-left": "18rem",
-    "margin-right": "2rem",
-    "padding": "2rem 1rem",
-    "background-color": "#f8f9fa",
-}
+# CONTENT_STYLE = {
+#     "transition": "margin-left .5s",
+#     "margin-left": "18rem",
+#     "margin-right": "2rem",
+#     "padding": "2rem 1rem",
+#     "background-color": "#ffffff",
+# }
 
-CONTENT_STYLE1 = {
-    "transition": "margin-left .5s",
-    "margin-left": "2rem",
-    "margin-right": "2rem",
-    "padding": "2rem 1rem",
-    "background-color": "#f8f9fa",
-}
+# CONTENT_STYLE1 = {
+#     "transition": "margin-left .5s",
+#     "margin-left": "2rem",
+#     "margin-right": "2rem",
+#     "padding": "2rem 1rem",
+#     "background-color": "#ffffff",
+# }
 
+
+def get_upload_component(id):
+    return du.Upload(
+        id=id,
+        max_file_size=1800,  # 1800 Mb
+        upload_id=uuid.uuid1(),  # Unique session id
+    )
+
+
+input_data_list = os.listdir('data/filtered_gene_bc_matrices')
 
 def get_layout():
 
     
     navbar = dbc.NavbarSimple(
     children=[
-        dbc.Button("Toggle", outline=True, color="secondary", className="mr-1", id="btn_sidebar"),
+        
     ],
     brand="single cell RNA-seq",
     brand_href="#",
@@ -83,35 +82,44 @@ def get_layout():
 
 
     # the style arguments for the sidebar. We use position:fixed and a fixed width
-    
+    chr
     sidebar = html.Div(
         [
-            html.H2("Sidebar", className="display-4"),
+            html.H2("Scanpy Analysis ", className="display-4"),
             html.Hr(),
             html.P(
-                "A simple sidebar layout with navigation links", className="lead"
-            ),
-            dbc.Nav(
-                [
-                    dbc.NavLink("Page 1", href="/page-1", id="page-1-link"),
-                    dbc.NavLink("Page 2", href="/page-2", id="page-2-link"),
-                    dbc.NavLink("Page 3", href="/page-3", id="page-3-link"),
-                ],
-                vertical=True,
-                pills=True,
-            ),
+                "This dashboard was built to analyze single cell RNA-sequencing data utilizing scanpy", className="lead",
+                style={'color':'white'}),
         ],
         id="sidebar",
         style=SIDEBAR_STYLE,
     )
 
-    content = html.Div(
-
-        id="page-content",
-        style=CONTENT_STYLE)
+    
+    
 
 
 
+    input_data_dropdown = html.Div(dcc.Dropdown(
+            id='dataset-dropdown',
+            #options=[{'label':'OLFR2 vs. GPI1', 'value': "'OLFR2','GPI1'"}, {'label': 'GPI1 vs. OLFR2', 'value': "'GPI1','OLFR2'"}],
+            options=input_data_list,
+             placeholder="Select scRNA-seq Dataset",
+        ),style={'padding': 17,'width':'25%','text-align':'center'})
+    
+    select_text = html.Div([html.H1('Select Dataset')],style={'padding': 10,"margin-left": "300px"})
+
+    input_button = html.Div(dbc.Button("Analyze", size="lg", className="me-1"),style={'padding':20,"margin-right": "0px"})
+    first_row_content = [
+    dbc.Col(select_text, width=3),
+    dbc.Col(input_data_dropdown, width=3),
+    dbc.Col(input_button,width=3)
+]
+    
+    first_row_content = dbc.Stack([select_text,input_data_dropdown,input_button],direction="horizontal",gap=1)
+
+
+    first_row_layout = dbc.Row(first_row_content,justify="center")
 
 
     layout = html.Div(
@@ -120,7 +128,7 @@ def get_layout():
         dcc.Location(id="url"),
         navbar,
         sidebar,
-        content,
+        first_row_layout
     ],
 )
 

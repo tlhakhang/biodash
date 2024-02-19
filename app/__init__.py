@@ -10,6 +10,7 @@ import dash_uploader as du
 import dash_bootstrap_components as dbc
 
 
+
 def create_app():
     server = Flask(__name__)
     server.config.from_object(BaseConfig)
@@ -45,6 +46,7 @@ def register_dashapps(app):
                          assets_folder=get_root_path(__name__) + '/dashapp1/assets/',
                          external_stylesheets=[dbc.themes.COSMO],
                          meta_tags=[meta_viewport])
+                         
     # dashapp2 = dash.Dash(__name__,
     #                      server=app,
     #                      url_base_pathname='/dashboard2/',
