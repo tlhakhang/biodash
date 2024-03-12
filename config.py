@@ -29,6 +29,7 @@ class BaseConfig:
     SQLALCHEMY_DATABASE_URI = (DB_URL)
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SECRET_KEY = 'secret_key'
+    FLASK_ENV='development'
     #SECRET_KEY = os.environ['SECRET_KEY']
 
 

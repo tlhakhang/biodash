@@ -7,8 +7,8 @@ from flask_login import current_user
 from flask_login import login_required
 from flask_login import login_user
 from flask_login import logout_user
-from werkzeug.urls import url_parse
-
+#from werkzeug.urls import url_parse
+from urllib.parse import urlparse
 from app.extensions import db
 from app.forms import LoginForm
 from app.forms import RegistrationForm
@@ -36,7 +36,7 @@ def login():
 
         login_user(user, remember=form.remember_me.data)
         next_page = request.args.get('next')
-        if not next_page or url_parse(next_page).netloc != '':
+        if not next_page or urlparse(next_page).netloc != '':
             next_page = url_for('main.index')
         return redirect(next_page)
 

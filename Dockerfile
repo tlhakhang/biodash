@@ -4,4 +4,4 @@ ADD . /python-flask
 WORKDIR /python-flask
 RUN pip install -r requirements.txt
 
-CMD [ "gunicorn", "-b 0.0.0.0:8000", "dashapp:server"]
+CMD [ "FLASK_ENV=development", "gunicorn", "-b 0.0.0.0:8000", "dashapp:server"]

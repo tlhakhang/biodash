@@ -35,119 +35,288 @@ import plotly.graph_objects as go
 import subprocess
 import sys
 import json
+import dash_uploader as du
+#from dash_uploader import UploadStatus
+from pathlib import Path
+import uuid
 
 
-SIDEBAR_STYLE = {
-    "position": "fixed",
-    "top": 62.5,
-    "left": 0,
-    "bottom": 0,
-    "width": "16rem",
-    "height": "100%",
-    "z-index": 1,
-    "overflow-x": "hidden",
-    "transition": "all 0.5s",
-    "padding": "0.5rem 1rem",
-    "background-color": "#f8f9fa",
-    }
 
-SIDEBAR_HIDEN = {
-    "position": "fixed",
-    "top": 62.5,
-    "left": "-16rem",
-    "bottom": 0,
-    "width": "16rem",
-    "height": "100%",
-    "z-index": 1,
-    "overflow-x": "hidden",
-    "transition": "all 0.5s",
-    "padding": "0rem 0rem",
-    "background-color": "#f8f9fa",
-}
-
-# the styles for the main content position it to the right of the sidebar and
-# add some padding.
-CONTENT_STYLE = {
-    "transition": "margin-left .5s",
-    "margin-left": "18rem",
-    "margin-right": "2rem",
-    "padding": "2rem 1rem",
-    "background-color": "#f8f9fa",
-}
-
-CONTENT_STYLE1 = {
-    "transition": "margin-left .5s",
-    "margin-left": "2rem",
-    "margin-right": "2rem",
-    "padding": "2rem 1rem",
-    "background-color": "#f8f9fa",
-}
-
-    
-
+# # the styles for the main content position it to the right of the sidebar and
+# # add some padding.
 
 
         
 def register_callbacks(dashapp):
     
     @dashapp.callback(
-    [
-        Output("sidebar", "style"),
-        Output("page-content", "style"),
-        Output("side_click", "data"),
-    ],
+        Output(component_id='intermediate-value-scanpy', component_property='data'),
+        [Input(component_id='analyze-button', component_property='n_clicks')],
+        [State(component_id='dataset-dropdown', component_property='value')])
+    def analyze_adata(n_clicks,value):
+        
+        print(value)
 
-    [Input("btn_sidebar", "n_clicks")],
-    [
-        State("side_click", "data"),
-    ]
-)
-    def toggle_sidebar(n, nclick):
-        if n:
-            if nclick == "SHOW":
-                sidebar_style = SIDEBAR_HIDEN
-                content_style = CONTENT_STYLE1
-                cur_nclick = "HIDDEN"
-            else:
-                sidebar_style = SIDEBAR_STYLE
-                content_style = CONTENT_STYLE
-                cur_nclick = "SHOW"
-        else:
-            sidebar_style = SIDEBAR_STYLE
-            content_style = CONTENT_STYLE
-            cur_nclick = 'SHOW'
+        value = '/Users/tenzin/Desktop/projects/biodash/data/filtered_gene_bc_matrices/' + str(value)
+        adata = sc.read_10x_mtx(value,  # the directory with the `.mtx` file
+        var_names="gene_symbols",  # use gene symbols for the variable names (variables-axis index)
+        cache=True,  # write a cache file for faster subsequent reading
+        )
+        adata.var_names_make_unique()  # this is unnecessary if using `var_names='gene_ids'` in `sc.read_10x_mtx`
+        #top_expressed = sc.pl.highest_expr_genes(adata, n_top=20)
+        sc.pp.filter_cells(adata, min_genes=200)
+        sc.pp.filter_genes(adata, min_cells=3)
+        # annotate the group of mitochondrial genes as "mt"
+        adata.var["mt"] = adata.var_names.str.startswith("MT-")
+        sc.pp.calculate_qc_metrics(
+        adata, qc_vars=["mt"], percent_top=None, log1p=False, inplace=True)
 
-        return sidebar_style, content_style, cur_nclick
+
+
+        adata = adata[adata.obs.n_genes_by_counts < 2500, :]
+        adata = adata[adata.obs.pct_counts_mt < 5, :].copy()
+
+
+        sc.pp.normalize_total(adata, target_sum=1e4)
+
+        sc.pp.log1p(adata)
+
+
+
+        sc.pp.highly_variable_genes(adata, min_mean=0.0125, max_mean=3, min_disp=0.5)
+
+
+
+        # sc.pl.highly_variable_genes(adata)
+        adata.raw = adata
+        adata = adata[:, adata.var.highly_variable]
+
+
+        sc.pp.regress_out(adata, ["total_counts", "pct_counts_mt"])
+
+
+        sc.pp.scale(adata, max_value=10)
+
+
+        sc.tl.pca(adata, svd_solver='arpack',n_comps=3)
+        sc.pp.neighbors(adata, n_neighbors=10, n_pcs=3)
+        sc.tl.umap(adata,n_components =3)
+        sc.tl.leiden(adata)
+
+        sc.tl.rank_genes_groups(adata, 'leiden', method='t-test')
+        result = adata.uns['rank_genes_groups']
+        groups = result['names'].dtype.names
+            
+        ranked_df = pd.DataFrame(
+                {'Cluster ' + group + '_' + key[:1]: result[key][group]
+                for group in groups for key in ['names', 'pvals']})[1:100]
+
+        print(ranked_df.head())
+        #adata_obs = adata.obs
+
+
+        #print(out_url)
+
+        df = pd.DataFrame((adata.obsm['X_umap']))
+        df['n_genes'] = adata.obs['n_genes_by_counts'].values
+        #df['cell'] = adata.obs['cell_barcodes'].to_list()
+        df['leiden'] = adata.obs['leiden'].values
+        df.columns = ['X','Y','Z','n_genes_by_counts','leiden']
+        
+        
+        df_2 = pd.DataFrame((adata.obs))
+
+        
+        print('\n')
+        print('\n')
+        print('\n')
+        print('\n')
+        print('\n')
+        print('\n')
+        print('\n')
+        print('\n')
+        
+        return(df.to_json(date_format='iso', orient='split'),
+               ranked_df.to_json(date_format='iso', orient='split'),
+                df_2.to_json(date_format='iso', orient='split'))
+
+
+
+    @dashapp.callback(
+    dash.dependencies.Output('scanpy-umap', 'figure'),
+    [dash.dependencies.Input('intermediate-value-scanpy', 'data')])
+
+    def get_umap(json_file):
+        
+        df = pd.read_json(json_file[0],orient='split')
+        print('hi there')
+        fig = px.scatter(df, x='X', y='Y',color='leiden',hover_data=['leiden'])
+        fig.update_layout(height=600, width=800)
+        fig.update_layout(
+            title={
+            'text' : 'UMAP - leiden',
+            'x':0.5,
+            'xanchor': 'center'
+        })
+        fig.update_layout(
+            font=dict(
+
+                family="Arial",
+                size=11,
+            ))
+        
+        
+
+        return(fig)
+
+    @dashapp.callback(Output('marker_rank_table', 'children'),
+        Input('intermediate-value-scanpy', 'data'))
+    def update_output(json_file):
+        #
+        
+        df = pd.read_json(json_file[1],orient='split')
+
+               # print(df.head())
+        table = html.Div([dash_table.DataTable(
+            columns=[{"name": i, "id": i} for i in df.columns],
+            style_table={
+                'overflowX': 'scroll',
+                'width':'100%',
+                'margin':'auto'},
+            data=df.to_dict('records'),
+            virtualization=True,
+            page_size=40,
+            sort_action="native",
+            style_header={'backgroundColor': 'rgb(30, 30, 30)'},
+            fixed_rows={'headers': True},
+            style_filter={
+                'backgroundColor': '#808080',
+                'color': 'black'
+            },  
+            style_cell={
+                'backgroundColor': 'rgb(77, 8, 43)',
+                'color': 'white',
+                'textAlign':'center',
+                'fontSize':10, 
+                'font-family':'sans-serif'},
+            
+            export_format='xlsx',
+            export_headers='display',
+            merge_duplicate_headers=True)]
+        )
+        
+                    
+
+        return(table)
+    
+
+    @dashapp.callback(
+    dash.dependencies.Output('scanpy-qc', 'figure'),
+    [dash.dependencies.Input('intermediate-value-scanpy', 'data')])
+
+    def get_qc(json_file):
+        
+        df = pd.read_json(json_file[2],orient='split')
+        fig = make_subplots(rows=1, cols=3)
+
+        fig.add_trace(go.Histogram(x=df['n_genes_by_counts']),row=1, col=1)
+        fig.add_trace(go.Histogram(x=df['total_counts']),row=1, col=2)
+        fig.add_trace(go.Histogram(x=df['pct_counts_mt']),row=1, col=3)
+        #fig.add_trace(go.Bar(x=gene_metrics_subset['total_counts'], y=gene_metrics_subset['gene'],orientation='h'),row=1,col=4)
+
+        #fig.update_layout(yaxis={'categoryorder':'total ascending'}) # add only this line
+        #fig.add_trace(go.Bar(x=gene_metrics_subset['total_counts'], y=gene_metrics_subset['gene'],orientation='h'),)
+
+
+        fig.update_xaxes(title_text="Number of genes per cell",row=1, col=1)
+        fig.update_xaxes(title_text="Total Counts", row=1, col=2)
+        fig.update_xaxes(title_text="Percent Mitochondrial", row=1, col=3)
+        #fig.update_xaxes(title_text="Top 50 Genes by Total UMI Counts", row=1, col=4)
+
+
+        fig.update_layout(height=600, width=800, title_text="Summary QC Metrics")
+        fig.update_layout(showlegend=False)
+        fig.update_layout(legend=dict(
+            yanchor="top",
+            y=0.99,
+            xanchor="left",
+            x=0.01
+        ))
+                #fig.update_traces(boxpoints=False) 
+        fig.update_yaxes(tickfont_size=7)
+        fig.update_layout(
+            font=dict(
+                family="Arial",
+                size=6,
+            ))
+
+        return(fig)
+
+                      
+
+
+        # gene_metrics = adata.var.sort_values(by=['total_counts'],ascending=False)[1:100]
+        # gene_metrics['gene'] = gene_metrics.index
+        # gene_metrics_subset = gene_metrics.sort_values(by=['total_counts'], ascending=False)[1:50]
+
+
+
+        # fig = make_subplots(rows=1, cols=6)
+
+        # fig.add_trace(go.Histogram(x=adata.obs['n_genes_by_counts']),row=1, col=1)
+        # fig.add_trace(go.Histogram(x=adata.obs['total_counts']),row=1, col=2)
+        # fig.add_trace(go.Histogram(x=adata.obs['pct_counts_mt']),row=1, col=3)
+        # fig.add_trace(go.Bar(x=gene_metrics_subset['total_counts'], y=gene_metrics_subset['gene'],orientation='h'),row=1,col=4)
+
+        # fig.update_layout(yaxis={'categoryorder':'total ascending'}) # add only this line
+        # #fig.add_trace(go.Bar(x=gene_metrics_subset['total_counts'], y=gene_metrics_subset['gene'],orientation='h'),)
+
+
+        # fig.update_xaxes(title_text="Number of genes per cell",row=1, col=1)
+        # fig.update_xaxes(title_text="Total Counts", row=1, col=2)
+        # fig.update_xaxes(title_text="Percent Mitochondrial", row=1, col=3)
+        # fig.update_xaxes(title_text="Top 50 Genes by Total UMI Counts", row=1, col=4)
+
+
+        # fig.update_layout(height=450, width=1200, title_text="Summary QC Metrics")
+        # fig.update_layout(showlegend=False)
+        # #fig.update_traces(boxpoints=False) 
+        # fig.update_yaxes(tickfont_size=7)
+        # fig.update_layout(
+        #     font=dict(
+        #         family="Arial",
+        #         size=6,
+        #     ))
+
+        #return(fig)
+        #return(df.to_json(date_format='iso', orient='split'),ranked_df.to_json(date_format='iso', orient='split'))
+
+
+
+
 
     # this callback uses the current pathname to set the active state of the
     # corresponding nav link to true, allowing users to tell see page they are on
-    @dashapp.callback(
-        [Output(f"page-{i}-link", "active") for i in range(1, 4)],
-        [Input("url", "pathname")],
-    )
-    def toggle_active_links(pathname):
-        if pathname == "/":
-            # Treat page 1 as the homepage / index
-            return True, False, False
-        return [pathname == f"/page-{i}" for i in range(1, 4)]
+
+        #return()
 
 
-    @dashapp.callback(Output("page-content", "children"), [Input("url", "pathname")])
-    def render_page_content(pathname):
-        if pathname in ["/", "/page-1"]:
-            return html.P("This is the content of page 1!")
-        elif pathname == "/page-2":
-            return html.P("This is the content of page 2. Yay!")
-        elif pathname == "/page-3":
-            return html.P("Oh cool, this is page 3!")
-        # If the user tries to reach a different page, return a 404 message
-        return dbc.Jumbotron(
-            [
-                html.H1("404: Not found", className="text-danger"),
-                html.Hr(),
-                html.P(f"The pathname {pathname} was not recognised..."),
-            ]
-        )
+    # @dashapp.callback(Output("page-content", "children"), [Input("url", "pathname")])
+    # def render_page_content(pathname):
+    #     if pathname in ["/dashboard1", "/dashboard1"]:
+    #         return html.P("This is the content of page 1!")
+    #     elif pathname == "/page-2":
+    #         return html.P("This is the content of page 2. Yay!")
+    #     elif pathname == "/page-3":
+    #         return html.P("Oh cool, this is page 3!")
+    #     # If the user tries to reach a different page, return a 404 message
+    #     return dbc.Jumbotron(
+    #         [
+    #             html.H1("404: Not found", className="text-danger"),
+    #             html.Hr(),
+    #             html.P(f"The pathname {pathname} was not recognised..."),
+    #         ]
+    #     )
 
 
     # @dashapp.callback(
@@ -240,7 +409,8 @@ def register_callbacks(dashapp):
 # #                      cutoff = 0.1)
         
         
-        
+
+
 #         fig = make_subplots(rows=1, cols=6)
 
 #         fig.add_trace(go.Box(y=adata.obs['n_genes_by_counts']),row=1, col=1)
@@ -264,8 +434,7 @@ def register_callbacks(dashapp):
 #                             name='Mapping Rate',
 #                             meanline_visible=True,points='all'),row=1,col=6)
 #         #gene_metrics_subset = gene_metrics.sort_values(by=['total_counts'], ascending=False)[1:50]
-        
-        
+    
 
 
 #         fig.update_xaxes(title_text="Number of genes per cell",row=1, col=1)
@@ -283,9 +452,10 @@ def register_callbacks(dashapp):
 #                 size=14,
 #             ))
         
-        
-        
-        
+
+
+
+
 
 #         sc.pp.normalize_total(adata, target_sum=1e4)
 #         sc.pp.log1p(adata)
