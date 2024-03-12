@@ -81,22 +81,9 @@ def get_layout():
 )
 
 
-    # the style arguments for the sidebar. We use position:fixed and a fixed width
-    chr
-    sidebar = html.Div(
-        [
-            html.H2("Scanpy Analysis ", className="display-4"),
-            html.Hr(),
-            html.P(
-                "This dashboard was built to analyze single cell RNA-sequencing data utilizing scanpy", className="lead",
-                style={'color':'white'}),
-        ],
-        id="sidebar",
-        style=SIDEBAR_STYLE,
-    )
 
-    
-    
+    alevin_scanpy_intermediate = html.Div(dcc.Store(id='intermediate-value-scanpy'), style={'display': 'none'})
+
 
 
 
@@ -105,21 +92,36 @@ def get_layout():
             #options=[{'label':'OLFR2 vs. GPI1', 'value': "'OLFR2','GPI1'"}, {'label': 'GPI1 vs. OLFR2', 'value': "'GPI1','OLFR2'"}],
             options=input_data_list,
              placeholder="Select scRNA-seq Dataset",
-        ),style={'padding': 17,'width':'25%','text-align':'center'})
+        ),style={'padding': 0,'width':'35%','text-align':'center'})
     
-    select_text = html.Div([html.H1('Select Dataset')],style={'padding': 10,"margin-left": "300px"})
+    select_text = html.Div([html.H2('Select Dataset')],style={'padding': 10,"margin-left": "300px"})
 
-    input_button = html.Div(dbc.Button("Analyze", size="lg", className="me-1"),style={'padding':20,"margin-right": "0px"})
+    input_button = html.Div(dbc.Button("Analyze", id="analyze-button", size="lg", className="me-1"),style={'padding':0,"margin-right": "0px"})
+    #input_button = html.Button('Submit', id='analyze-button')
     first_row_content = [
     dbc.Col(select_text, width=3),
-    dbc.Col(input_data_dropdown, width=3),
+    dbc.Col(input_data_dropdown, width=6),
     dbc.Col(input_button,width=3)
 ]
     
-    first_row_content = dbc.Stack([select_text,input_data_dropdown,input_button],direction="horizontal",gap=1)
 
 
+    first_row_content = dbc.Stack([select_text,input_data_dropdown,input_button],direction="horizontal",gap=5)
     first_row_layout = dbc.Row(first_row_content,justify="center")
+
+    umap_figure = dbc.Col(html.Div(dcc.Graph(id="scanpy-umap"),style={'textAlign': 'center'}),width=4)
+    qc_figure = dbc.Col(html.Div(dcc.Graph(id="scanpy-qc"),style={'textAlign': 'center'}),width=4)
+    
+    alevin_marker_table = dbc.Col(html.Div([html.Div(id='marker_rank_table')]),width=4)
+    
+
+
+    second_row_layout = html.Div(dbc.Stack([qc_figure,umap_figure,alevin_marker_table],direction="horizontal",
+            gap=3))
+    
+
+    
+
 
 
     layout = html.Div(
@@ -127,8 +129,9 @@ def get_layout():
         dcc.Store(id='side_click'),
         dcc.Location(id="url"),
         navbar,
-        sidebar,
-        first_row_layout
+        first_row_layout,
+        second_row_layout,
+        alevin_scanpy_intermediate
     ],
 )
 
