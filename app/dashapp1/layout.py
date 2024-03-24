@@ -106,7 +106,7 @@ def get_layout():
     
 
 
-    first_row_content = dbc.Stack([select_text,input_data_dropdown,input_button],direction="horizontal",gap=5)
+    first_row_content = html.Div([select_text,input_data_dropdown,input_button])
     first_row_layout = dbc.Row(first_row_content,justify="center")
 
     umap_figure = dbc.Col(html.Div(dcc.Graph(id="scanpy-umap"),style={'textAlign': 'center'}),width=4)
@@ -116,9 +116,7 @@ def get_layout():
     
 
 
-    second_row_layout = html.Div(dbc.Stack([qc_figure,umap_figure,alevin_marker_table],direction="horizontal",
-            gap=3))
-    
+    second_row_layout = html.Div([qc_figure,umap_figure,alevin_marker_table])
 
     
 
